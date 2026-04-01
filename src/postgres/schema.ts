@@ -1,4 +1,3 @@
-import { sql } from "drizzle-orm";
 import { char, decimal, integer, pgEnum, pgTable, varchar } from "drizzle-orm/pg-core";
 
 export const accountStatusEnum = pgEnum('account_status', ['active', 'suspended']);

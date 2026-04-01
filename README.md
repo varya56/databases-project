@@ -1,15 +1,17 @@
 # final-project
 
 To install dependencies:
-
 ```bash
-bun install
+npm install
 ```
 
 To run:
-
 ```bash
-bun run index.ts
+node index.ts
 ```
 
-This project was created using `bun init` in bun v1.3.10. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+To add seed data, run:
+```bash
+npx drizzle-kit push # to push the postgres schema to the database
+node ./src/postgres/seed.ts # add seed data
+```

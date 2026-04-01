@@ -4,7 +4,7 @@ const transactionSchema = new Schema({
     sender: Number,
     recipients: [Number],
     content: String,
-    // tags: [String],
+    visibility: String,
     // comments: [{
     //     user: String,
     //     content: String,
