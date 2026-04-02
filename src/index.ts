@@ -5,6 +5,7 @@ import {connectToMongo, disconnectMongo} from "./mongo/db.ts";
 import {Transaction} from "./mongo/models/transaction";
 import {createHash} from "crypto"
 import {input, select, password, number} from "@inquirer/prompts";
+import {exists} from "drizzle-orm/sql/expressions/conditions";
 
 type User = typeof usersTable.$inferSelect;
 
@@ -21,11 +22,12 @@ async function createUser(first_name: string, last_name: string, email: string, 
     return result[0];
 }
 
-async function createTransaction(sender_id: number, recipient_ids: [number], content: string, visibility: "public" | "friends-only" | "private") {
+async function createTransaction(sender_id: number, recipient_ids: [number], amount: number, content: string, visibility: "public" | "friends-only" | "private") {
     try {
         await Transaction.create({
             sender: sender_id,
             recipients: recipient_ids,
+            amount: amount,
             content: content,
             visibility: visibility
         });
@@ -51,17 +53,64 @@ async function terminalRegisterUser() {
         message: "What is your email?"
     });
     const ssn = await password({
-        message: "What is your SSN?"
+        message: "What is your SSN?",
+        mask: true
     })
 
     await createUser(first_name, last_name, email, ssn)
 }
 
-async function terminal_list_public_transactions() {
+async function terminalListPublicTransactions() {
     const results = await Transaction.find({visibility: "public"})
+    if (results.length == 0) {
+        console.log("No transactions found.")
+        return;
+    }
     for (const t of results) {
         console.log(`Transaction ID: ${t._id}.\nSender ID: ${t.sender}\nContent: ${t.content}.\nVisibility: ${t.visibility}.\n`);
     }
+}
+
+async function terminalCreateTransaction() {
+    let senderID: number;
+    const senderEmail = await input({
+        message: "Sender's email: ", required: true, validate: (async (str: string) => {
+            let user = await db.select({id: usersTable.id}).from(usersTable).where(eq(usersTable.email, str));
+            if (user.length == 0) {
+                return "No user with this email found."
+            }
+            senderID = user[0].id
+            return true
+        })
+    });
+
+    const recipientEmails = await input({required: true, message: "Recipient email addresses (comma separated): "});
+    const amount = await number({
+        message: "Transaction Amount: ", min: 0.01, step: 0.01, required: true
+    });
+    const content = await input({message: "Transaction message: ", required: true})
+    const visibility = await select({
+        message: "Transaction visibility", choices: [
+            {
+                name: "Public",
+                value: "public"
+            },
+            {
+                name: "Friends Only",
+                value: "friends-only"
+            },
+            {
+                name: "Private",
+                value: "private"
+            }
+        ]
+    })
+
+    let emails: String[] = recipientEmails.split(",")
+
+    // todo
+    await createTransaction(senderID, [1], amount, content, visibility);
+
 
 }
 
@@ -78,9 +127,13 @@ async function main() {
                     value: "register"
                 },
                 {
-                    name: "List Public Transactions",
-                    value: "list_public_transactions"
+                    name: "Create Transaction",
+                    value: "createTransaction"
                 },
+                {
+                    name: "List Public Transactions",
+                    value: "listPublicTransactions"
+                }
             ]
         })
         switch (answer) {
@@ -88,10 +141,15 @@ async function main() {
                 await terminalRegisterUser();
                 break;
             }
-            case "list_public_transactions": {
-                await terminal_list_public_transactions();
+            case "createTransaction": {
+                await terminalCreateTransaction();
                 break;
             }
+            case "listPublicTransactions": {
+                await terminalListPublicTransactions();
+                break;
+            }
+
 
         }
     }

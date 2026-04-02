@@ -3,9 +3,9 @@ import {model, Schema} from "mongoose"
 const transactionSchema = new Schema({
     sender: Number,
     recipients: [Number],
+    amount: Number,
     content: String,
     visibility: String,
-    amount: Number,
     // comments: [{
     //     user: String,
     //     content: String,
