@@ -4,19 +4,21 @@ import {eq} from "drizzle-orm"
 import {connectToMongo, disconnectMongo} from "./mongo/db.ts";
 import {Transaction} from "./mongo/models/transaction";
 import {createHash} from "crypto"
+import {input, select, password, number} from "@inquirer/prompts";
 
 type User = typeof usersTable.$inferSelect;
 
 async function createUser(first_name: string, last_name: string, email: string, ssn: string) {
-    await db.insert(usersTable)
+    const result = await db.insert(usersTable)
         .values({
-            first_name: first_name,
-            last_name: last_name,
-            email: email,
+            first_name,
+            last_name,
+            email,
             ssn_hash: createHash("sha256").update(ssn).digest("hex")
         })
         .onConflictDoNothing()
-        .returning({id: usersTable.id});
+        .returning();
+    return result[0];
 }
 
 async function createTransaction(sender_id: number, recipient_ids: [number], content: string, visibility: "public" | "friends-only" | "private") {
@@ -32,48 +34,69 @@ async function createTransaction(sender_id: number, recipient_ids: [number], con
     }
 }
 
-/**
- * Finds one user by their email.
- * @param email
- */
+
 async function findUserByEmail(email: string): Promise<User | undefined> {
     const user = await db.select().from(usersTable).where(eq(usersTable.email, email));
-
-    if (user.length == 0) {
-        return undefined;
-    }
     return user[0];
+}
+
+async function terminalRegisterUser() {
+    const first_name = await input({
+        message: "What is your first name?"
+    });
+    const last_name = await input({
+        message: "What is your last name?"
+    });
+    const email = await input({
+        message: "What is your email?"
+    });
+    const ssn = await password({
+        message: "What is your SSN?"
+    })
+
+    await createUser(first_name, last_name, email, ssn)
+}
+
+async function terminal_list_public_transactions() {
+    const results = await Transaction.find({visibility: "public"})
+    for (const t of results) {
+        console.log(`Transaction ID: ${t._id}.\nSender ID: ${t.sender}\nContent: ${t.content}.\nVisibility: ${t.visibility}.\n`);
+    }
+
 }
 
 async function main() {
     await connectToMongo();
 
-    // const users = await db.select().from(usersTable);
-    // console.log('Getting all users from the database: ', users)
+    let running = true;
+    while (running) {
+        const answer = await select({
+            message: "Please select an option.",
+            choices: [
+                {
+                    name: "Register Account",
+                    value: "register"
+                },
+                {
+                    name: "List Public Transactions",
+                    value: "list_public_transactions"
+                },
+            ]
+        })
+        switch (answer) {
+            case "register": {
+                await terminalRegisterUser();
+                break;
+            }
+            case "list_public_transactions": {
+                await terminal_list_public_transactions();
+                break;
+            }
 
-
-    const user1 = await findUserByEmail("hayden@example.com")
-    if (!user1) {
-        console.log("Could not find user1.")
-        return;
+        }
     }
-
-    const user2 = await findUserByEmail("test@example.com")
-    if (!user2) {
-        console.log("Could not find user2.")
-        return;
-    }
-
-    // make a transaction between these two users
-    await createTransaction(user1.id, [user2.id], "Test transaction!", "public");
-    //
-    // get transactions created by user 1
-    const user1_transactions = await Transaction.find({sender: user1.id})
-    console.log(user1_transactions);
 
     await disconnectMongo();
-
-
 }
 
 await main();

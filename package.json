@@ -12,6 +12,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@inquirer/prompts": "^8.3.2",
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.45.2",
     "drizzle-seed": "^0.3.1",

@@ -5,6 +5,7 @@ const transactionSchema = new Schema({
     recipients: [Number],
     content: String,
     visibility: String,
+    amount: Number,
     // comments: [{
     //     user: String,
     //     content: String,
