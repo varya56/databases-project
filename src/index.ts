@@ -5,17 +5,18 @@ import {connectToMongo, disconnectMongo} from "./mongo/db.ts";
 import {Transaction} from "./mongo/models/transaction";
 import {createHash} from "crypto"
 import {input, select, password, number} from "@inquirer/prompts";
-import {exists} from "drizzle-orm/sql/expressions/conditions";
+//import {exists} from "drizzle-orm/sql/expressions/conditions";
 
 type User = typeof usersTable.$inferSelect;
 
-async function createUser(first_name: string, last_name: string, email: string, ssn: string) {
+async function createUser(first_name: string, last_name: string, email: string, ssn: string, pw:string) {
     const result = await db.insert(usersTable)
         .values({
             first_name,
             last_name,
             email,
-            ssn_hash: createHash("sha256").update(ssn).digest("hex")
+            ssn_hash: createHash("sha256").update(ssn).digest("hex"),
+            password_hash: createHash("sha256").update(pw).digest("hex")
         })
         .onConflictDoNothing()
         .returning();
@@ -55,9 +56,13 @@ async function terminalRegisterUser() {
     const ssn = await password({
         message: "What is your SSN?",
         mask: true
-    })
+    });
+    const pw = await password({
+        message: "Choose a password:",
+        mask: true
+    });
 
-    await createUser(first_name, last_name, email, ssn)
+    await createUser(first_name, last_name, email, ssn, pw)
 }
 
 async function terminalListPublicTransactions() {
@@ -72,14 +77,14 @@ async function terminalListPublicTransactions() {
 }
 
 async function terminalCreateTransaction() {
-    let senderID: number;
+    let senderID: number = 0;
     const senderEmail = await input({
         message: "Sender's email: ", required: true, validate: (async (str: string) => {
             let user = await db.select({id: usersTable.id}).from(usersTable).where(eq(usersTable.email, str));
             if (user.length == 0) {
                 return "No user with this email found."
             }
-            senderID = user[0].id
+            senderID = user[0]!.id
             return true
         })
     });
@@ -109,9 +114,25 @@ async function terminalCreateTransaction() {
     let emails: String[] = recipientEmails.split(",")
 
     // todo
-    await createTransaction(senderID, [1], amount, content, visibility);
+    await createTransaction(senderID, [1], amount, content, visibility as "public" | "friends-only" | "private");
 
 
+}
+
+async function loginUser(email: string, pw: string): Promise<User | undefined> {
+    const user = await db.select().from(usersTable).where(eq(usersTable.email, email));
+    if (user.length === 0 || user[0]?.password_hash !== createHash("sha256").update(pw).digest("hex")) {
+        console.log("Invalid email or password.");
+        return undefined;
+    }
+    console.log(`Welcome back, ${user[0].first_name}!`);
+    return user[0];
+}
+
+async function terminalLogin() {
+    const email = await input({ message: "Email: ", required: true });
+    const pw = await password({ message: "Password: ", mask: true });
+    await loginUser(email, pw);
 }
 
 async function main() {
@@ -127,18 +148,30 @@ async function main() {
                     value: "register"
                 },
                 {
+                    name: "Login",
+                    value: "login"
+                },
+                {
                     name: "Create Transaction",
                     value: "createTransaction"
                 },
                 {
                     name: "List Public Transactions",
                     value: "listPublicTransactions"
+                },
+                {
+                    name: "Exit",
+                    value: "exit"
                 }
             ]
         })
         switch (answer) {
             case "register": {
                 await terminalRegisterUser();
+                break;
+            }
+            case "login": {
+                await terminalLogin();
                 break;
             }
             case "createTransaction": {
@@ -149,8 +182,10 @@ async function main() {
                 await terminalListPublicTransactions();
                 break;
             }
-
-
+            case "exit": {
+                running = false;
+                break;
+            }
         }
     }
 
