@@ -134,6 +134,16 @@ async function main() {
                     value: "listPublicTransactions"
                 },
                 {
+                    name: "List Graph Users",
+                    value: "listGraphUsers",
+                    disabled: "To do"
+                },
+                {
+                    name: "Get Friend Recommendations",
+                    value: "friendRecommendations",
+                    disabled: "To do"
+                },
+                {
                     name: "Exit",
                     value: "exit"
                 }
@@ -145,14 +155,6 @@ async function main() {
                 {
                     name: "Login",
                     value: "login"
-                },
-                {
-                    name: "List Graph Users",
-                    value: "listGraphUsers"
-                },
-                {
-                    name: "Get Friend Recommendations",
-                    value: "friendRecommendations"
                 },
                 {
                     name: "Exit",
