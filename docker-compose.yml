@@ -35,7 +35,7 @@ services:
       - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
 
   neo4j:
-    image: neo4j:2026.02.2
+    image: neo4j:2026.03.1
     ports:
       - 7474:7474
       - 7687:7687

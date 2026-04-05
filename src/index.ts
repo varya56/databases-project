@@ -5,6 +5,8 @@ import {connectToMongo, createTransaction, disconnectMongo, unknownUser} from ".
 import {Transaction} from "./mongo/models/transaction";
 import {createHash} from "crypto"
 import {input, select, password, number, Separator, checkbox} from "@inquirer/prompts";
+import { connectToNeo4j, disconnectNeo4j } from './neo4j/db';
+import { getAllUsers} from './neo4j/models/userRelations';
 
 
 async function terminalRegisterUser() {
@@ -92,7 +94,6 @@ async function terminalCreateTransaction() {
         ]
     })
 
-    // todo
     await createTransaction(currentUser.id, recipientIDs, amount, content, visibility as "public" | "friends-only" | "private");
 
 
@@ -117,6 +118,7 @@ let currentUser: User | undefined = undefined;
 
 async function main() {
     await connectToMongo();
+    await connectToNeo4j();
 
     let running = true;
     while (running) {
@@ -145,6 +147,14 @@ async function main() {
                     value: "login"
                 },
                 {
+                    name: "List Graph Users",
+                    value: "listGraphUsers"
+                },
+                {
+                    name: "Get Friend Recommendations",
+                    value: "friendRecommendations"
+                },
+                {
                     name: "Exit",
                     value: "exit"
                 }
@@ -167,14 +177,22 @@ async function main() {
                 await terminalListPublicTransactions();
                 break;
             }
+            case "listGraphUsers": {
+                const users = await getAllUsers();
+                for (const u of users) {
+                    console.log(`User ID: ${u.userId} | Username: ${u.username} | Email: ${u.email}`);
+                }
+                break;
+            }
             case "exit": {
-                await disconnectMongo();
                 running = false;
                 break;
             }
         }
     }
 
+    await disconnectMongo();
+    await disconnectNeo4j();
 }
 
 await main();
