@@ -5,6 +5,8 @@ import {connectToMongo, disconnectMongo} from "./mongo/db.ts";
 import {Transaction} from "./mongo/models/transaction";
 import {createHash} from "crypto"
 import {input, select, password, number} from "@inquirer/prompts";
+import { connectToNeo4j, disconnectNeo4j } from './neo4j/db';
+import { getAllUsers} from './neo4j/models/userRelations';
 //import {exists} from "drizzle-orm/sql/expressions/conditions";
 
 type User = typeof usersTable.$inferSelect;
@@ -137,6 +139,7 @@ async function terminalLogin() {
 
 async function main() {
     await connectToMongo();
+    await connectToNeo4j();
 
     let running = true;
     while (running) {
@@ -162,7 +165,15 @@ async function main() {
                 {
                     name: "Exit",
                     value: "exit"
-                }
+                },
+                {
+                    name: "List Graph Users",
+                    value: "listGraphUsers"
+                },
+                {
+                    name: "Get Friend Recommendations",
+                    value: "friendRecommendations"
+                },
             ]
         })
         switch (answer) {
@@ -182,6 +193,13 @@ async function main() {
                 await terminalListPublicTransactions();
                 break;
             }
+            case "listGraphUsers": {
+                const users = await getAllUsers();
+                for (const u of users) {
+                    console.log(`User ID: ${u.userId} | Username: ${u.username} | Email: ${u.email}`);
+                }
+                break;
+            }
             case "exit": {
                 running = false;
                 break;
@@ -190,6 +208,7 @@ async function main() {
     }
 
     await disconnectMongo();
+    await disconnectNeo4j();
 }
 
 await main();
