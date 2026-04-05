@@ -163,10 +163,6 @@ async function main() {
                     value: "listPublicTransactions"
                 },
                 {
-                    name: "Exit",
-                    value: "exit"
-                },
-                {
                     name: "List Graph Users",
                     value: "listGraphUsers"
                 },
@@ -174,6 +170,10 @@ async function main() {
                     name: "Get Friend Recommendations",
                     value: "friendRecommendations"
                 },
+                {
+                    name: "Exit",
+                    value: "exit"
+                }
             ]
         })
         switch (answer) {
