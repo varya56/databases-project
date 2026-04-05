@@ -1,5 +1,6 @@
 import mongoose from "mongoose"
 import 'dotenv/config';
+import { Transaction } from "./models/transaction";
 
 
 export async function connectToMongo() {
@@ -10,4 +11,18 @@ export async function connectToMongo() {
 
 export async function disconnectMongo() {
     await mongoose.disconnect();
+}
+
+export async function createTransaction(sender_id: number, recipient_ids: [number], amount: number, content: string, visibility: "public" | "friends-only" | "private") {
+    try {
+        await Transaction.create({
+            sender: sender_id,
+            recipients: recipient_ids,
+            amount: amount,
+            content: content,
+            visibility: visibility
+        });
+    } catch (err) {
+        console.log("Could not create transaction: " + err);
+    }
 }

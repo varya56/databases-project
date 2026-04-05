@@ -1,15 +1,12 @@
-import {usersTable} from './postgres/schema';
-import {db} from "./postgres/db"
-import {eq} from "drizzle-orm"
-import {connectToMongo, disconnectMongo} from "./mongo/db.ts";
-import {Transaction} from "./mongo/models/transaction";
-import {createHash} from "crypto"
-import {input, select, password, number} from "@inquirer/prompts";
-//import {exists} from "drizzle-orm/sql/expressions/conditions";
+import { usersTable } from './postgres/schema';
+import { db, getUserFromID, type User } from "./postgres/db"
+import { eq } from "drizzle-orm"
+import { connectToMongo, createTransaction, disconnectMongo } from "./mongo/db.ts";
+import { Transaction } from "./mongo/models/transaction";
+import { createHash } from "crypto"
+import { input, select, password, number, Separator } from "@inquirer/prompts";
 
-type User = typeof usersTable.$inferSelect;
-
-async function createUser(first_name: string, last_name: string, email: string, ssn: string, pw:string) {
+async function createUser(first_name: string, last_name: string, email: string, ssn: string, pw: string) {
     const result = await db.insert(usersTable)
         .values({
             first_name,
@@ -21,26 +18,6 @@ async function createUser(first_name: string, last_name: string, email: string, 
         .onConflictDoNothing()
         .returning();
     return result[0];
-}
-
-async function createTransaction(sender_id: number, recipient_ids: [number], amount: number, content: string, visibility: "public" | "friends-only" | "private") {
-    try {
-        await Transaction.create({
-            sender: sender_id,
-            recipients: recipient_ids,
-            amount: amount,
-            content: content,
-            visibility: visibility
-        });
-    } catch (err) {
-        console.log("Could not create transaction: " + err);
-    }
-}
-
-
-async function findUserByEmail(email: string): Promise<User | undefined> {
-    const user = await db.select().from(usersTable).where(eq(usersTable.email, email));
-    return user[0];
 }
 
 async function terminalRegisterUser() {
@@ -66,21 +43,43 @@ async function terminalRegisterUser() {
 }
 
 async function terminalListPublicTransactions() {
-    const results = await Transaction.find({visibility: "public"})
+    const results = await Transaction.find({ visibility: "public" })
+    let choices: any[] = [];
     if (results.length == 0) {
         console.log("No transactions found.")
         return;
     }
     for (const t of results) {
-        console.log(`Transaction ID: ${t._id}.\nSender ID: ${t.sender}\nContent: ${t.content}.\nVisibility: ${t.visibility}.\n`);
+        let senderUser = await getUserFromID(t.sender)
+        if (senderUser == undefined) {
+            senderUser = {
+                id: 1,
+                first_name: "Unknown",
+                last_name: "User",
+                email: "unknown@example.com",
+                balance: "0.00",
+                ssn_hash: "0",
+                status: "active",
+                password_hash: "-"
+            }
+        }
+
+        choices.push({
+            value: t._id,
+            name: `${senderUser.first_name} ${senderUser.last_name} -> ${t.recipients}: \$${t.amount}`,
+            description: t.content,
+        });
     }
+    choices.push(new Separator("-- end of list --"))
+    choices.push({ value: "quit", name: "Go back", description: "Go back to the main menu." })
+    await select({ message: "Select transaction:", choices: choices })
 }
 
 async function terminalCreateTransaction() {
     let senderID: number = 0;
     const senderEmail = await input({
         message: "Sender's email: ", required: true, validate: (async (str: string) => {
-            let user = await db.select({id: usersTable.id}).from(usersTable).where(eq(usersTable.email, str));
+            let user = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, str));
             if (user.length == 0) {
                 return "No user with this email found."
             }
@@ -89,11 +88,11 @@ async function terminalCreateTransaction() {
         })
     });
 
-    const recipientEmails = await input({required: true, message: "Recipient email addresses (comma separated): "});
+    const recipientEmails = await input({ required: true, message: "Recipient email addresses (comma separated): " });
     const amount = await number({
         message: "Transaction Amount: ", min: 0.01, step: 0.01, required: true
     });
-    const content = await input({message: "Transaction message: ", required: true})
+    const content = await input({ message: "Transaction message: ", required: true })
     const visibility = await select({
         message: "Transaction visibility", choices: [
             {
@@ -138,8 +137,7 @@ async function terminalLogin() {
 async function main() {
     await connectToMongo();
 
-    let running = true;
-    while (running) {
+    while (true) {
         const answer = await select({
             message: "Please select an option.",
             choices: [
@@ -183,13 +181,12 @@ async function main() {
                 break;
             }
             case "exit": {
-                running = false;
+                await disconnectMongo();
                 break;
             }
         }
     }
 
-    await disconnectMongo();
 }
 
 await main();
