@@ -1,35 +1,41 @@
 import {usersTable} from './schema';
 import {db} from "./db"
-import {reset, seed} from "drizzle-seed";
 import {createHash} from "crypto";
 
 
 async function main() {
-    await reset(db, {usersTable});
-
-    await seed(db, {usersTable}).refine((f) => ({
-        usersTable: {
-            columns: {
-                ssn_hash: f.string(),
-                balance: f.number({maxValue: 5000.00})
-            },
-            count: 2
-        }
-    }));
 
     await db.insert(usersTable).values({
         email: "hayden@example.com",
         first_name: "Hayden",
         last_name: "Example",
-        ssn_hash: createHash("sha256").update("111-22-3333").digest("hex")
-    });
+        ssn_hash: createHash("sha256").update("000-00-0001").digest("hex"),
+        balance: "50.00",
+        status: "active",
+        password_hash: createHash("sha256").update("test").digest("hex")
+    }).onConflictDoNothing();
 
     await db.insert(usersTable).values({
-        email: "test@example.com",
-        first_name: "John",
+        email: "jake@example.com",
+        first_name: "Jake",
         last_name: "Example",
-        ssn_hash: createHash("sha256").update("111-22-3334").digest("hex")
-    });
+        ssn_hash: createHash("sha256").update("000-00-0002").digest("hex"),
+        balance: "100.00",
+        status: "active",
+        password_hash: createHash("sha256").update("test").digest("hex")
+    }).onConflictDoNothing();
+
+
+    await db.insert(usersTable).values({
+        email: "varvara@example.com",
+        first_name: "Varvara",
+        last_name: "Example",
+        ssn_hash: createHash("sha256").update("000-00-0003").digest("hex"),
+        balance: "250.00",
+        status: "active",
+        password_hash: createHash("sha256").update("test").digest("hex")
+    }).onConflictDoNothing();
+
 
     console.log('Added example data!')
 }
