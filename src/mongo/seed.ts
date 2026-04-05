@@ -1,5 +1,5 @@
-import {connectToMongo, disconnectMongo} from "../db.ts";
-import {Transaction} from "./transaction";
+import {connectToMongo, disconnectMongo} from "./db.ts";
+import {Transaction} from "./models/transaction";
 
 await connectToMongo();
 await Transaction.insertOne({
