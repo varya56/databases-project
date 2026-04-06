@@ -102,6 +102,19 @@ async function terminalCreateTransaction() {
 
 }
 
+async function terminalListGraphUsers() {
+    const users = await getAllUsers();
+
+    if (users.length == 0) {
+        console.log("No users found.");
+        return;
+    }
+
+    for (const u of users) {
+        console.log(`User ID: ${u.userId} | Username: ${u.username} | Email: ${u.email}`);
+    }
+}
+
 
 async function terminalLogin() {
     const email = await input({message: "Email: ", required: true});
@@ -182,10 +195,7 @@ async function main() {
                 break;
             }
             case "listGraphUsers": {
-                const users = await getAllUsers();
-                for (const u of users) {
-                    console.log(`User ID: ${u.userId} | Username: ${u.username} | Email: ${u.email}`);
-                }
+                await terminalListGraphUsers();
                 break;
             }
             case "exit": {
