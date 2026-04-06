@@ -135,8 +135,7 @@ async function main() {
                 },
                 {
                     name: "List Graph Users",
-                    value: "listGraphUsers",
-                    disabled: "To do"
+                    value: "listGraphUsers"
                 },
                 {
                     name: "Get Friend Recommendations",

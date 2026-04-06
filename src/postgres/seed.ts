@@ -16,17 +16,6 @@ async function main() {
     }).onConflictDoNothing();
 
     await db.insert(usersTable).values({
-        email: "jake@example.com",
-        first_name: "Jake",
-        last_name: "Example",
-        ssn_hash: createHash("sha256").update("000-00-0002").digest("hex"),
-        balance: "100.00",
-        status: "active",
-        password_hash: createHash("sha256").update("test").digest("hex")
-    }).onConflictDoNothing();
-
-
-    await db.insert(usersTable).values({
         email: "varvara@example.com",
         first_name: "Varvara",
         last_name: "Example",
@@ -36,8 +25,17 @@ async function main() {
         password_hash: createHash("sha256").update("test").digest("hex")
     }).onConflictDoNothing();
 
+    await db.insert(usersTable).values({
+        email: "jake@example.com",
+        first_name: "Jake",
+        last_name: "Example",
+        ssn_hash: createHash("sha256").update("000-00-0002").digest("hex"),
+        balance: "100.00",
+        status: "active",
+        password_hash: createHash("sha256").update("test").digest("hex")
+    }).onConflictDoNothing();
 
-    console.log('Added example data!')
 }
 
 await main();
+console.log('Added example data!')
