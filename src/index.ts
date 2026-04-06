@@ -5,8 +5,8 @@ import {connectToMongo, createTransaction, disconnectMongo, unknownUser} from ".
 import {Transaction} from "./mongo/models/transaction";
 import {createHash} from "crypto"
 import {input, select, password, number, Separator, checkbox} from "@inquirer/prompts";
-import { connectToNeo4j, disconnectNeo4j } from './neo4j/db';
-import { getAllUsers} from './neo4j/models/userRelations';
+import {connectToNeo4j, disconnectNeo4j} from './neo4j/db';
+import {getAllUsers} from './neo4j/models/userRelations';
 
 
 async function terminalRegisterUser() {
@@ -72,30 +72,33 @@ async function terminalCreateTransaction() {
         value: usersTable.id,
         name: usersTable.first_name
     }).from(usersTable).where(ne(usersTable.id, currentUser.id))
-    const recipientIDs = await checkbox({required: true, message: "Select recipients.", choices: allUsers})
-    const amount = await number({
-        message: "Transaction Amount: ", min: 0.01, step: 0.01, required: true
-    });
-    const content = await input({message: "Transaction message: ", required: true})
-    const visibility = await select({
-        message: "Transaction visibility", choices: [
-            {
-                name: "Public",
-                value: "public"
-            },
-            {
-                name: "Friends Only",
-                value: "friends-only"
-            },
-            {
-                name: "Private",
-                value: "private"
-            }
-        ]
-    })
+    if (allUsers.length != 0) {
+        const recipientIDs = await checkbox({required: true, message: "Select recipients.", choices: allUsers})
+        const amount = await number({
+            message: "Transaction Amount: ", min: 0.01, step: 0.01, required: true
+        });
+        const content = await input({message: "Transaction message: ", required: true})
+        const visibility = await select({
+            message: "Transaction visibility", choices: [
+                {
+                    name: "Public",
+                    value: "public"
+                },
+                {
+                    name: "Friends Only",
+                    value: "friends-only"
+                },
+                {
+                    name: "Private",
+                    value: "private"
+                }
+            ]
+        })
 
-    await createTransaction(currentUser.id, recipientIDs, amount, content, visibility as "public" | "friends-only" | "private");
-
+        await createTransaction(currentUser.id, recipientIDs, amount, content, visibility as "public" | "friends-only" | "private");
+    } else {
+        console.log("No other users are in the database. You cannot make transactions.")
+    }
 
 }
 
