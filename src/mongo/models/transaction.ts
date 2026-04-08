@@ -6,11 +6,14 @@ const transactionSchema = new Schema({
     amount: Number,
     content: String,
     visibility: String,
-    // comments: [{
-    //     user: String,
-    //     content: String,
-    //     votes: Number
-    // }]
+    comments: [{
+        user: String,
+        content: String,
+    }],
+    reactions: [{
+        user: Number,
+        reaction: String
+    }]
 }, {
     timestamps: true
 });

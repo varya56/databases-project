@@ -1,7 +1,10 @@
 import {usersTable} from './postgres/schema';
 import {createUser, db, getUserFromID, type User} from "./postgres/db"
 import {eq, ne} from "drizzle-orm"
-import {connectToMongo, createTransaction, disconnectMongo, unknownUser} from "./mongo/db.ts";
+import {
+    addCommentToTransaction,
+    addReactionToTransaction, connectToMongo, createTransaction, disconnectMongo, unknownUser
+} from "./mongo/db.ts";
 import {Transaction} from "./mongo/models/transaction";
 import {createHash} from "crypto"
 import {input, select, password, number, Separator, checkbox} from "@inquirer/prompts";
@@ -32,13 +35,13 @@ async function terminalRegisterUser() {
 }
 
 async function terminalListPublicTransactions() {
-    const results = await Transaction.find({visibility: "public"})
+    const allPublicTransactions = await Transaction.find({visibility: "public"})
     let choices: any[] = [];
-    if (results.length == 0) {
+    if (allPublicTransactions.length == 0) {
         console.log("No transactions found.")
         return;
     }
-    for (const t of results) {
+    for (const t of allPublicTransactions) {
         let senderUser = await getUserFromID(t.sender)
         if (senderUser == undefined) {
             senderUser = unknownUser
@@ -48,21 +51,53 @@ async function terminalListPublicTransactions() {
             let user = await getUserFromID(r);
             if (i == 0) {
                 recipients = (user == undefined ? `Unknown user` : `${user.first_name} ${user.last_name}`);
-
             } else {
                 recipients += (user == undefined ? `, Unknown user` : `, ${user.first_name} ${user.last_name}`);
             }
         }
 
         choices.push({
-            value: t._id,
+            value: t.id,
             name: `${senderUser.first_name} ${senderUser.last_name} -> ${recipients}: \$${t.amount}`,
-            description: t.content,
+            description: `${t.content} | ${t.reactions.length} reactions | ${t.comments.length} comments.`,
         });
     }
     choices.push(new Separator("-- end of list --"))
     choices.push({value: "quit", name: "Go back", description: "Go back to the main menu."})
-    await select({message: "Select transaction:", choices: choices})
+    const selectedTransactionID: string = await select({message: "Select transaction:", choices: choices})
+
+    console.log(selectedTransactionID)
+    if (selectedTransactionID == "quit") {
+        return;
+    }
+    const transactionAction = await select({
+        message: "Please select an option", choices: [
+            {
+                name: "Add comment",
+                value: "comment"
+            },
+            {
+                name: "Add reaction",
+                value: "react"
+            },
+            {
+                name: "Quit",
+                value: "quit"
+            },
+        ]
+    })
+
+
+    if (transactionAction == "comment") {
+        await addCommentToTransaction(selectedTransactionID, currentUser, await input({
+            message: "Enter comment:",
+            required: true
+        }));
+    } else if (transactionAction == "react") {
+        await addReactionToTransaction(selectedTransactionID, currentUser);
+    } else {
+        return;
+    }
 }
 
 async function terminalCreateTransaction() {
@@ -72,10 +107,12 @@ async function terminalCreateTransaction() {
         value: usersTable.id,
         name: usersTable.first_name
     }).from(usersTable).where(ne(usersTable.id, currentUser.id))
+
+
     if (allUsers.length != 0) {
         const recipientIDs = await checkbox({required: true, message: "Select recipients.", choices: allUsers})
         const amount = await number({
-            message: "Transaction Amount: ", min: 0.01, step: 0.01, required: true
+            message: "Transaction Amount: ", min: 0.01, step: 0.01, max: Number(currentUser.balance), required: true
         });
         const content = await input({message: "Transaction message: ", required: true})
         const visibility = await select({
@@ -164,6 +201,10 @@ async function main() {
                 }
             ]
         })
+        // refresh the current user's information
+        if (currentUser != undefined) {
+            currentUser = (await db.select().from(usersTable).where(eq(usersTable.email, currentUser.email)))[0]
+        }
         switch (answer) {
             case "register": {
                 await terminalRegisterUser();

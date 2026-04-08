@@ -17,6 +17,7 @@ async function main() {
         amount: 50.00,
         visibility: "public"
     })
+    await disconnectMongo();
 
 }
 
