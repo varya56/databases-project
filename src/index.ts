@@ -6,7 +6,7 @@ import {Transaction} from "./mongo/models/transaction";
 import {createHash} from "crypto"
 import {input, select, password, number, Separator, checkbox} from "@inquirer/prompts";
 import {connectToNeo4j, disconnectNeo4j} from './neo4j/db';
-import {getAllUsers} from './neo4j/models/userRelations';
+import {createUser as createNeo4jUser, createTransactionRelationship, createFriendship, areFriends, getFriendRecommendations, getAllUsers} from './neo4j/models/userRelations';
 
 
 async function terminalRegisterUser() {
@@ -28,7 +28,15 @@ async function terminalRegisterUser() {
         mask: true
     });
 
-    await createUser(first_name, last_name, email, ssn, pw)
+    const newUser = await createUser(first_name, last_name, email, ssn, pw);
+
+    if (newUser) {
+        await createNeo4jUser(
+            newUser.id,
+            `${newUser.first_name} ${newUser.last_name}`,
+            newUser.email
+        );
+    }
 }
 
 async function terminalListPublicTransactions() {
@@ -95,7 +103,16 @@ async function terminalCreateTransaction() {
             ]
         })
 
-        await createTransaction(currentUser.id, recipientIDs, amount, content, visibility as "public" | "friends-only" | "private");
+        const transactionId = await createTransaction(currentUser.id, recipientIDs, amount, content, visibility as "public" | "friends-only" | "private");
+
+        if (transactionId) {
+            await createTransactionRelationship(
+                currentUser.id,
+                recipientIDs,
+                amount,
+                transactionId
+            );
+        }
     } else {
         console.log("No other users are in the database. You cannot make transactions.")
     }
@@ -112,6 +129,62 @@ async function terminalListGraphUsers() {
 
     for (const u of users) {
         console.log(`User ID: ${u.userId} | Username: ${u.username} | Email: ${u.email}`);
+    }
+}
+
+async function terminalAddFriend() {
+    // Get all users from Postgres except the current user
+    const allUsers = await db.select({
+        value: usersTable.id,
+        name: usersTable.first_name,
+        email: usersTable.email
+    }).from(usersTable).where(ne(usersTable.id, currentUser!.id));
+
+    if (allUsers.length === 0) {
+        console.log("No other users to add as friends.");
+        return;
+    }
+
+    // Label each choice to show if already friends
+    const choices = await Promise.all(allUsers.map(async (u) => {
+        const already = await areFriends(currentUser!.id, u.value);
+        return {
+            value: u.value,
+            name: already
+                ? `${u.name} (${u.email}) — already friends`
+                : `${u.name} (${u.email})`,
+            disabled: already
+        };
+    }));
+
+    const available = choices.filter(c => !c.disabled);
+    if (available.length === 0) {
+        console.log("You are already friends with everyone!");
+        return;
+    }
+
+    const selectedId = await select({
+        message: "Select a user to add as a friend:",
+        choices: choices
+    });
+
+    await createFriendship(currentUser!.id, selectedId);
+
+    const selectedUser = allUsers.find(u => u.value === selectedId);
+    console.log(`You are now friends with ${selectedUser?.name}!`);
+}
+
+async function terminalFriendRecommendations() {
+    const recs = await getFriendRecommendations(currentUser!.id);
+
+    if (recs.length === 0) {
+        console.log("No recommendations yet — add more friends to get suggestions!");
+        return;
+    }
+
+    console.log("People you might know:");
+    for (const r of recs) {
+        console.log(`  ${r.username} (${r.email}) — ${r.mutualFriends} mutual friend${r.mutualFriends === 1 ? '' : 's'}`);
     }
 }
 
@@ -150,13 +223,16 @@ async function main() {
                     value: "listPublicTransactions"
                 },
                 {
-                    name: "List Graph Users",
-                    value: "listGraphUsers"
+                    name: "Add Friend",
+                    value: "addFriend"
                 },
                 {
-                    name: "Get Friend Recommendations",
-                    value: "friendRecommendations",
-                    disabled: "To do"
+                    name: "Friend Recommendations",
+                    value: "friendRecommendations"
+                },
+                {
+                    name: "List Graph Users",
+                    value: "listGraphUsers"
                 },
                 {
                     name: "Exit",
@@ -196,6 +272,14 @@ async function main() {
             }
             case "listGraphUsers": {
                 await terminalListGraphUsers();
+                break;
+            }
+            case "addFriend": {
+                await terminalAddFriend();
+                break;
+            }
+            case "friendRecommendations": {
+                await terminalFriendRecommendations();
                 break;
             }
             case "exit": {

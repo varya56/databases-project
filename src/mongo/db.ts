@@ -16,15 +16,17 @@ export async function disconnectMongo() {
 
 export async function createTransaction(sender_id: number, recipient_ids: number[], amount: number, content: string, visibility: "public" | "friends-only" | "private") {
     try {
-        await Transaction.create({
+        const t = await Transaction.create({
             sender: sender_id,
             recipients: recipient_ids,
             amount: amount,
             content: content,
             visibility: visibility
         });
+        return t._id.toString();
     } catch (err) {
         console.log("Could not create transaction: " + err);
+        return null;
     }
 }
 
