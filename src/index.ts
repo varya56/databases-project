@@ -224,6 +224,50 @@ async function terminalFriendRecommendations() {
     }
 }
 
+async function terminalListMyTransactions(){
+    const results = await Transaction.find({
+        $or: [
+            { sender: currentUser!.id },
+            { recipients: currentUser!.id }
+        ]
+    });
+
+    if (results.length === 0) {
+        console.log("No transactions found.");
+        return;
+    }
+
+    let choices: any[] = [];
+
+    for (const t of results) {
+        let senderUser = await getUserFromID(t.sender);
+        if (senderUser == undefined) senderUser = unknownUser;
+
+        let recipients = "";
+        for (const [i, r] of t.recipients.entries()) {
+            let user = await getUserFromID(r);
+            const name = user ? `${user.first_name} ${user.last_name}` : "Unknown user";
+            if (i === 0) {
+                recipients = name;
+            } else {
+                recipients += `, ${name}`;
+            }
+        }
+
+        const isSender = t.sender === currentUser!.id;
+        const label = isSender ? "SENT" : "RECEIVED";
+
+        choices.push({
+            value: t._id,
+            name: `[${label}] ${senderUser.first_name} ${senderUser.last_name} -> ${recipients}: $${t.amount}`,
+            description: `${t.content} (${t.visibility})`,
+        });
+    }
+    choices.push({ value: "quit", name: "Go back" });
+
+    await select({ message: "Your transactions:", choices });
+}
+
 
 async function terminalLogin() {
     const email = await input({message: "Email: ", required: true});
@@ -275,6 +319,10 @@ async function main() {
                 {
                     name: "List Public Transactions",
                     value: "listPublicTransactions"
+                },
+                {
+                    name: "My Transactions",
+                    value: "myTransactions"
                 },
                 {
                     name: "Add Friend",
@@ -342,6 +390,10 @@ async function main() {
                     await terminalListPublicTransactions();
                 } catch {
                 }
+                break;
+            }
+            case "myTransactions": {
+                await terminalListMyTransactions();
                 break;
             }
             case "listGraphUsers": {
