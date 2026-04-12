@@ -3,6 +3,7 @@ import {drizzle} from 'drizzle-orm/node-postgres';
 import {usersTable} from './schema';
 import {eq} from "drizzle-orm"
 import {createHash} from "crypto";
+import {unknownUser} from "../mongo/db.ts";
 
 export type User = typeof usersTable.$inferSelect;
 
@@ -13,9 +14,10 @@ export async function findUserByEmail(email: string): Promise<User | undefined> 
     return user[0];
 }
 
-export async function getUserFromID(id: number): Promise<User | undefined> {
+export async function getUserFromID(id: number): Promise<User> {
     const user = await db.select().from(usersTable).where(eq(usersTable.id, id));
-    if (user == undefined || user.length == 0) return;
+    if (user == undefined || user.length == 0) return unknownUser;
+    // @ts-ignore
     return user[0];
 }
 
