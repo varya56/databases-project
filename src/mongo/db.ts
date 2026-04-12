@@ -17,7 +17,7 @@ export async function disconnectMongo() {
     await mongoose.connection.close(true);
 }
 
-export async function createTransaction(sender_id: number, recipient_ids: number[], amount: number, content: string, visibility: "public" | "friends-only" | "private") {
+export async function createTransaction(sender_id: number, recipient_ids: number[], amount: number, content: string, visibility: "public" | "friends-only" | "private"): Promise<string | undefined> {
     let sender;
     try {
         let senders = await db.select({
@@ -43,7 +43,7 @@ export async function createTransaction(sender_id: number, recipient_ids: number
 
     await db.transaction(async (tx) => {
         try {
-            await Transaction.create({
+            const t = await Transaction.create({
                 sender: sender_id,
                 recipients: recipient_ids,
                 amount: amount,
@@ -62,9 +62,11 @@ export async function createTransaction(sender_id: number, recipient_ids: number
                     ${amount}`
                 }).where(eq(usersTable.id, recipient));
             }
+            return t.id
         } catch {
             tx.rollback();
             console.log("Could not create transaction!")
+            return;
         }
     });
 }
@@ -95,7 +97,9 @@ export async function addCommentToTransaction(selectedTransactionID: string, cur
 }
 
 export async function addReactionToTransaction(selectedTransactionID: string, currentUser: User) {
-    const reactions = ["❤️", "👍", "👎", "😎"]
+    const reactions = ["❤️", "👍", "👎", "😎"].map(n => {
+        return {name: n, value: n}
+    })
     let transaction = await Transaction.findById(selectedTransactionID).exec();
     if (transaction == undefined) {
         console.log("Transaction was not found.")
@@ -103,12 +107,8 @@ export async function addReactionToTransaction(selectedTransactionID: string, cu
     }
     transaction.reactions.push({
         user: currentUser.id,
-        content: await select({
-            message: "Select reaction:", choices:
-                reactions.map(n => {
-                    return {name: n, value: n}
-                })
-
+        reaction: await select({
+            message: "Select reaction:", choices: reactions
         })
     });
     await transaction.save();
@@ -121,6 +121,10 @@ export async function printTransactionComments(transactionID: string) {
         console.log("Transaction was not found.")
         return;
     }
+    if (transaction.comments.length == 0) {
+        console.log("No comments.")
+        return;
+    }
     for (const c of transaction.comments) {
         // @ts-ignore
         let user = await getUserFromID(c.user)
@@ -128,10 +132,15 @@ export async function printTransactionComments(transactionID: string) {
     }
 
 }
+
 export async function printTransactionReactions(transactionID: string) {
     let transaction = await Transaction.findById(transactionID).exec();
     if (transaction == undefined) {
         console.log("Transaction was not found.")
+        return;
+    }
+    if (transaction.reactions.length == 0) {
+        console.log("No reactions.")
         return;
     }
     for (const r of transaction.reactions) {
