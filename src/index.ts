@@ -1,16 +1,16 @@
 import {usersTable} from './postgres/schema';
-import {createUser, db, getUserFromID, type User} from "./postgres/db"
-import {eq, ne} from "drizzle-orm"
+import {createUser, db, type User} from "./postgres/db"
+import {eq, ne, sql} from "drizzle-orm"
 import {
     addCommentToTransaction,
     addReactionToTransaction,
     connectToMongo,
     createTransaction,
     disconnectMongo,
+    printAndGetPublicTransactions,
     printTransactionComments,
     printTransactionReactions
 } from "./mongo/db.ts";
-import {Transaction} from "./mongo/models/transaction";
 import {createHash} from "crypto"
 import {checkbox, input, number, password, select, Separator} from "@inquirer/prompts";
 import {connectToNeo4j, disconnectNeo4j} from './neo4j/db';
@@ -58,32 +58,12 @@ async function terminalRegisterUser() {
 
 async function terminalListPublicTransactions() {
     while (true) {
-        const allPublicTransactions = await Transaction.find({visibility: "public"})
-        let choices: any[] = [];
-        if (allPublicTransactions.length == 0) {
-            console.log("No transactions found.")
-            return;
-        }
-        for (const t of allPublicTransactions) {
-            let senderUser = await getUserFromID(t.sender)
-            let recipients = "";
-            for (const [i, r] of t.recipients.entries()) {
-                let user = await getUserFromID(r);
-                if (i == 0) {
-                    recipients = `${user.first_name} ${user.last_name}`;
-                } else {
-                    recipients += `, ${user.first_name} ${user.last_name}`;
-                }
-            }
+        const choices = await printAndGetPublicTransactions();
+        if (choices.length == 0) return;
 
-            choices.push({
-                value: t.id,
-                name: `${senderUser.first_name} ${senderUser.last_name} -> ${recipients}: \$${t.amount}`,
-                description: `${t.content} | ${t.reactions.length} reactions | ${t.comments.length} comments.`,
-            });
-        }
         choices.push(new Separator("-- end of list --"))
         choices.push({value: "quit", name: "Go back", description: "Go back to the main menu."})
+
         const selectedTransactionID: string = await select({message: "Select transaction:", choices: choices})
 
         if (selectedTransactionID == "quit") {
@@ -261,6 +241,24 @@ async function terminalLogin() {
 
 let currentUser: User;
 
+async function terminalDepositMoney() {
+    const amount = await number({message: "Enter deposit amount: ", min: 0.01, step: 0.01, max: 1000});
+    const ssn = await input({
+        message: "Please confirm your SSN:", validate: (n) => {
+            if (createHash("sha256").update(n).digest("hex") != currentUser.ssn_hash) {
+                return "SSN does not match!"
+            } else return true
+        }
+    });
+
+    await db.update(usersTable).set({
+        balance: sql`${usersTable.balance}
+        +
+        ${amount}`
+    }).where(eq(usersTable.id, currentUser.id))
+
+}
+
 async function main() {
     await connectToMongo();
     await connectToNeo4j();
@@ -289,6 +287,10 @@ async function main() {
                 {
                     name: "List Graph Users",
                     value: "listGraphUsers"
+                },
+                {
+                    name: "Deposit money",
+                    value: "depositMoney"
                 },
                 {
                     name: "Exit",
@@ -352,6 +354,13 @@ async function main() {
             }
             case "friendRecommendations": {
                 await terminalFriendRecommendations();
+                break;
+            }
+            case "depositMoney": {
+                try {
+                    await terminalDepositMoney();
+                } catch {
+                }
                 break;
             }
             case "exit": {
