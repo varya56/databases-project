@@ -1,12 +1,27 @@
 import {usersTable} from './postgres/schema';
 import {createUser, db, getUserFromID, type User} from "./postgres/db"
 import {eq, ne} from "drizzle-orm"
-import {connectToMongo, createTransaction, disconnectMongo, unknownUser} from "./mongo/db.ts";
+import {
+    addCommentToTransaction,
+    addReactionToTransaction,
+    connectToMongo,
+    createTransaction,
+    disconnectMongo,
+    printTransactionComments,
+    printTransactionReactions
+} from "./mongo/db.ts";
 import {Transaction} from "./mongo/models/transaction";
 import {createHash} from "crypto"
-import {input, select, password, number, Separator, checkbox} from "@inquirer/prompts";
+import {checkbox, input, number, password, select, Separator} from "@inquirer/prompts";
 import {connectToNeo4j, disconnectNeo4j} from './neo4j/db';
-import {createUser as createNeo4jUser, createTransactionRelationship, createFriendship, areFriends, getFriendRecommendations, getAllUsers} from './neo4j/models/userRelations';
+import {
+    areFriends,
+    createFriendship,
+    createTransactionRelationship,
+    createUser as createNeo4jUser,
+    getAllUsers,
+    getFriendRecommendations
+} from './neo4j/models/userRelations';
 
 
 async function terminalRegisterUser() {
@@ -36,46 +51,88 @@ async function terminalRegisterUser() {
             `${newUser.first_name} ${newUser.last_name}`,
             newUser.email
         );
+    } else {
+        console.log("Could not create user!")
     }
 }
 
 async function terminalListPublicTransactions() {
-    const results = await Transaction.find({visibility: "public"})
-    let choices: any[] = [];
-    if (results.length == 0) {
-        console.log("No transactions found.")
-        return;
-    }
-    for (const t of results) {
-        let senderUser = await getUserFromID(t.sender)
-        if (senderUser == undefined) {
-            senderUser = unknownUser
+    while (true) {
+        const allPublicTransactions = await Transaction.find({visibility: "public"})
+        let choices: any[] = [];
+        if (allPublicTransactions.length == 0) {
+            console.log("No transactions found.")
+            return;
         }
-        let recipients = "";
-        for (const [i, r] of t.recipients.entries()) {
-            let user = await getUserFromID(r);
-            if (i == 0) {
-                recipients = (user == undefined ? `Unknown user` : `${user.first_name} ${user.last_name}`);
-
-            } else {
-                recipients += (user == undefined ? `, Unknown user` : `, ${user.first_name} ${user.last_name}`);
+        for (const t of allPublicTransactions) {
+            let senderUser = await getUserFromID(t.sender)
+            let recipients = "";
+            for (const [i, r] of t.recipients.entries()) {
+                let user = await getUserFromID(r);
+                if (i == 0) {
+                    recipients = `${user.first_name} ${user.last_name}`;
+                } else {
+                    recipients += `, ${user.first_name} ${user.last_name}`;
+                }
             }
-        }
 
-        choices.push({
-            value: t._id,
-            name: `${senderUser.first_name} ${senderUser.last_name} -> ${recipients}: \$${t.amount}`,
-            description: t.content,
-        });
+            choices.push({
+                value: t.id,
+                name: `${senderUser.first_name} ${senderUser.last_name} -> ${recipients}: \$${t.amount}`,
+                description: `${t.content} | ${t.reactions.length} reactions | ${t.comments.length} comments.`,
+            });
+        }
+        choices.push(new Separator("-- end of list --"))
+        choices.push({value: "quit", name: "Go back", description: "Go back to the main menu."})
+        const selectedTransactionID: string = await select({message: "Select transaction:", choices: choices})
+
+        if (selectedTransactionID == "quit") {
+            return;
+        }
+        const transactionAction = await select({
+            message: "Please select an option", choices: [
+                {
+                    name: "View comments",
+                    value: "view_comments"
+                },
+                {
+                    name: "Add comment",
+                    value: "add_comment"
+                },
+                {
+                    name: "View reactions",
+                    value: "view_reactions"
+                },
+                {
+                    name: "Add reaction",
+                    value: "add_reaction"
+                },
+                {
+                    name: "Quit",
+                    value: "quit"
+                },
+            ]
+        })
+
+
+        if (transactionAction == "add_comment") {
+            await addCommentToTransaction(selectedTransactionID, currentUser, await input({
+                message: "Enter comment:",
+                required: true
+            }));
+        } else if (transactionAction == "add_reaction") {
+            await addReactionToTransaction(selectedTransactionID, currentUser);
+        } else if (transactionAction == "view_comments") {
+            await printTransactionComments(selectedTransactionID);
+        } else if (transactionAction == "view_reactions") {
+            await printTransactionReactions(selectedTransactionID);
+        } else {
+            break;
+        }
     }
-    choices.push(new Separator("-- end of list --"))
-    choices.push({value: "quit", name: "Go back", description: "Go back to the main menu."})
-    await select({message: "Select transaction:", choices: choices})
 }
 
 async function terminalCreateTransaction() {
-
-    // const recipientEmails = await input({required: true, message: "Recipient email addresses (comma separated): "});
     let allUsers = await db.select({
         value: usersTable.id,
         name: usersTable.first_name
@@ -104,7 +161,6 @@ async function terminalCreateTransaction() {
         })
 
         const transactionId = await createTransaction(currentUser.id, recipientIDs, amount, content, visibility as "public" | "friends-only" | "private");
-
         if (transactionId) {
             await createTransactionRelationship(
                 currentUser.id,
@@ -203,7 +259,7 @@ async function terminalLogin() {
     currentUser = user[0];
 }
 
-let currentUser: User | undefined = undefined;
+let currentUser: User;
 
 async function main() {
     await connectToMongo();
@@ -252,22 +308,38 @@ async function main() {
                     value: "exit"
                 }
             ]
-        })
+        });
+        // refresh the current user's information
+        if (currentUser != undefined) {
+            currentUser = (await db.select().from(usersTable).where(eq(usersTable.email, currentUser.email)))[0]
+        }
         switch (answer) {
             case "register": {
-                await terminalRegisterUser();
+                try {
+                    await terminalRegisterUser();
+                } catch {
+                }
                 break;
             }
             case "login": {
-                await terminalLogin();
+                try {
+                    await terminalLogin();
+                } catch {
+                }
                 break;
             }
             case "createTransaction": {
-                await terminalCreateTransaction();
+                try {
+                    await terminalCreateTransaction();
+                } catch {
+                }
                 break;
             }
             case "listPublicTransactions": {
-                await terminalListPublicTransactions();
+                try {
+                    await terminalListPublicTransactions();
+                } catch {
+                }
                 break;
             }
             case "listGraphUsers": {
@@ -284,6 +356,7 @@ async function main() {
             }
             case "exit": {
                 running = false;
+                console.log("Disconnecting from databases...")
                 break;
             }
         }
