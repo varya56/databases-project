@@ -148,5 +148,33 @@ export async function printTransactionReactions(transactionID: string) {
         let user = await getUserFromID(r.user)
         console.log(`${user.first_name} ${user.last_name}: ${r.reaction}`)
     }
+}
 
+export async function printAndGetPublicTransactions() {
+    const allPublicTransactions = await Transaction.find({visibility: "public"})
+    let choices: any[] = [];
+    if (allPublicTransactions.length == 0) {
+        console.log("No transactions found.")
+        return [];
+    }
+
+    for (const t of allPublicTransactions) {
+        let senderUser = await getUserFromID(t.sender)
+        let recipients = "";
+        for (const [i, r] of t.recipients.entries()) {
+            let user = await getUserFromID(r);
+            if (i == 0) {
+                recipients = `${user.first_name} ${user.last_name}`;
+            } else {
+                recipients += `, ${user.first_name} ${user.last_name}`;
+            }
+        }
+
+        choices.push({
+            value: t.id,
+            name: `${senderUser.first_name} ${senderUser.last_name} -> ${recipients}: \$${t.amount}`,
+            description: `${t.content} | ${t.reactions.length} reactions | ${t.comments.length} comments.`,
+        });
+    }
+    return choices;
 }
