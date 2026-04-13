@@ -243,12 +243,13 @@ let currentUser: User;
 
 async function terminalDepositMoney() {
     const amount = await number({message: "Enter deposit amount: ", min: 0.01, step: 0.01, max: 1000});
-    const ssn = await input({
+    const ssn = await password({
         message: "Please confirm your SSN:", validate: (n) => {
             if (createHash("sha256").update(n).digest("hex") != currentUser.ssn_hash) {
                 return "SSN does not match!"
             } else return true
-        }
+        },
+        mask: true
     });
 
     await db.update(usersTable).set({
