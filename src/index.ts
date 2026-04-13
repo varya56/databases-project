@@ -116,7 +116,7 @@ async function terminalCreateTransaction() {
     let allUsers = await db.select({
         value: usersTable.id,
         name: usersTable.first_name
-    }).from(usersTable).where(ne(usersTable.id, currentUser.id))
+    }).from(usersTable).where(ne(usersTable.id, currentUser!.id))
     if (allUsers.length != 0) {
         const recipientIDs = await checkbox({required: true, message: "Select recipients.", choices: allUsers})
         const amount = await number({
@@ -140,10 +140,11 @@ async function terminalCreateTransaction() {
             ]
         })
 
-        const transactionId = await createTransaction(currentUser.id, recipientIDs, amount, content, visibility as "public" | "friends-only" | "private");
+        const transactionId = await createTransaction(currentUser!.id, recipientIDs, amount, content, visibility as "public" | "friends-only" | "private");
+
         if (transactionId) {
             await createTransactionRelationship(
-                currentUser.id,
+                currentUser!.id,
                 recipientIDs,
                 amount,
                 transactionId
@@ -240,7 +241,7 @@ async function terminalListMyTransactions(){
     let choices: any[] = [];
 
     for (const t of results) {
-        let senderUser = await getUserFromID(t.sender);
+        let senderUser = await getUserFromID(t.sender!);
         if (senderUser == undefined) senderUser = unknownUser;
 
         let recipients = "";
