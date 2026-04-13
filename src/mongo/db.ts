@@ -41,7 +41,7 @@ export async function createTransaction(sender_id: number, recipient_ids: number
         return;
     }
 
-    await db.transaction(async (tx) => {
+    return await db.transaction(async (tx) => {
         try {
             const t = await Transaction.create({
                 sender: sender_id,

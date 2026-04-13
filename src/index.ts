@@ -1,5 +1,5 @@
 import {usersTable} from './postgres/schema';
-import {createUser, db, type User} from "./postgres/db"
+import {createUser, db, getUserFromID, type User} from "./postgres/db"
 import {eq, ne, sql} from "drizzle-orm"
 import {
     addCommentToTransaction,
@@ -9,8 +9,10 @@ import {
     disconnectMongo,
     printAndGetPublicTransactions,
     printTransactionComments,
-    printTransactionReactions
+    printTransactionReactions,
+    unknownUser
 } from "./mongo/db.ts";
+import {Transaction} from "./mongo/models/transaction";
 import {createHash} from "crypto"
 import {checkbox, input, number, password, select, Separator} from "@inquirer/prompts";
 import {connectToNeo4j, disconnectNeo4j} from './neo4j/db';
@@ -96,12 +98,12 @@ async function terminalListPublicTransactions() {
 
 
         if (transactionAction == "add_comment") {
-            await addCommentToTransaction(selectedTransactionID, currentUser, await input({
+            await addCommentToTransaction(selectedTransactionID, currentUser!, await input({
                 message: "Enter comment:",
                 required: true
             }));
         } else if (transactionAction == "add_reaction") {
-            await addReactionToTransaction(selectedTransactionID, currentUser);
+            await addReactionToTransaction(selectedTransactionID, currentUser!);
         } else if (transactionAction == "view_comments") {
             await printTransactionComments(selectedTransactionID);
         } else if (transactionAction == "view_reactions") {
@@ -284,13 +286,13 @@ async function terminalLogin() {
     currentUser = user[0];
 }
 
-let currentUser: User;
+let currentUser: User | undefined = undefined;
 
 async function terminalDepositMoney() {
     const amount = await number({message: "Enter deposit amount: ", min: 0.01, step: 0.01, max: 1000});
     const ssn = await input({
         message: "Please confirm your SSN:", validate: (n) => {
-            if (createHash("sha256").update(n).digest("hex") != currentUser.ssn_hash) {
+            if (createHash("sha256").update(n).digest("hex") != currentUser!.ssn_hash) {
                 return "SSN does not match!"
             } else return true
         }
@@ -300,7 +302,7 @@ async function terminalDepositMoney() {
         balance: sql`${usersTable.balance}
         +
         ${amount}`
-    }).where(eq(usersTable.id, currentUser.id))
+    }).where(eq(usersTable.id, currentUser!.id))
 
 }
 
@@ -362,7 +364,7 @@ async function main() {
         });
         // refresh the current user's information
         if (currentUser != undefined) {
-            currentUser = (await db.select().from(usersTable).where(eq(usersTable.email, currentUser.email)))[0]
+            currentUser = (await db.select().from(usersTable).where(eq(usersTable.email, currentUser.email)))[0] ?? currentUser
         }
         switch (answer) {
             case "register": {
