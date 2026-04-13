@@ -3,7 +3,7 @@ import {db} from "./db"
 import {createHash} from "crypto";
 
 
-async function main() {
+export async function PostgresSeed() {
 
     await db.insert(usersTable).values({
         email: "hayden@example.com",
@@ -37,5 +37,5 @@ async function main() {
 
 }
 
-await main();
-console.log('Added example data!')
+//await PostgresSeed();
+console.log('Added postgres data!')

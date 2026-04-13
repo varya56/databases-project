@@ -1,7 +1,7 @@
 import { connectToNeo4j, disconnectNeo4j, driver } from './db';
 import { createUser, createFriendship} from './models/userRelations';
 
-async function main() {
+export async function NeoSeed() {
     await connectToNeo4j();
 
     // Clear existing graph data so seed is repeatable
@@ -21,4 +21,5 @@ async function main() {
     await disconnectNeo4j();
 }
 
-await main();
+//await NeoSeed();
+console.log("Added Neo4J data!");

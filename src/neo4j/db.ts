@@ -8,7 +8,6 @@ const driver = neo4j.driver(
 
 export async function connectToNeo4j() {
     await driver.verifyConnectivity();
-    console.log('Connected to Neo4j.');
     return driver;
 }
 

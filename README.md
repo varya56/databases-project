@@ -18,7 +18,7 @@ npx tsx src/index.ts
 
 To add seed data, run:
 ```bash
-node ./src/postgres/seed.ts
+node ./src/seed.ts
 # or
-npx tsx src/postgres/seed.ts
+npx tsx src/seed.ts
 ```

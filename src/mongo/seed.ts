@@ -1,7 +1,7 @@
 import {connectToMongo, disconnectMongo} from "./db.ts";
 import {Transaction} from "./models/transaction";
 
-async function main() {
+export async function MongoSeed() {
     await connectToMongo();
     await Transaction.insertOne({
         recipients: [2],
@@ -21,5 +21,5 @@ async function main() {
 
 }
 
-await main()
-console.log("Added data!");
+//await MongoSeed()
+console.log("Added mongo data!");
