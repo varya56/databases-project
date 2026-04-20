@@ -122,7 +122,7 @@ async function terminalCreateTransaction() {
     if (allUsers.length != 0) {
         const recipientIDs = await checkbox({required: true, message: "Select recipients.", choices: allUsers})
         const amount = await number({
-            message: "Transaction Amount: ", min: 0.01, step: 0.01, required: true
+            message: "Transaction Amount: ", min: 0.01, step: 0.01, max: Number(currentUser!.balance), required: true
         });
         const content = await input({message: "Transaction message: ", required: true})
         const visibility = await select({
@@ -227,11 +227,11 @@ async function terminalFriendRecommendations() {
     }
 }
 
-async function terminalListMyTransactions(){
+async function terminalListMyTransactions() {
     const results = await Transaction.find({
         $or: [
-            { sender: currentUser!.id },
-            { recipients: currentUser!.id }
+            {sender: currentUser!.id},
+            {recipients: currentUser!.id}
         ]
     });
 
@@ -266,9 +266,9 @@ async function terminalListMyTransactions(){
             description: `${t.content} (${t.visibility})`,
         });
     }
-    choices.push({ value: "quit", name: "Go back" });
+    choices.push({value: "quit", name: "Go back"});
 
-    await select({ message: "Your transactions:", choices });
+    await select({message: "Your transactions:", choices});
 }
 
 
@@ -290,12 +290,13 @@ let currentUser: User | undefined = undefined;
 
 async function terminalDepositMoney() {
     const amount = await number({message: "Enter deposit amount: ", min: 0.01, step: 0.01, max: 1000});
-    const ssn = await input({
+    const ssn = await password({
         message: "Please confirm your SSN:", validate: (n) => {
             if (createHash("sha256").update(n).digest("hex") != currentUser!.ssn_hash) {
                 return "SSN does not match!"
             } else return true
-        }
+        },
+        mask: true
     });
 
     await db.update(usersTable).set({
