@@ -178,3 +178,39 @@ export async function printAndGetPublicTransactions() {
     }
     return choices;
 }
+
+export async function getFriendsTransactions(friendIds: number[]) {
+    if (friendIds.length === 0) return [];
+
+    const transactions = await Transaction.find({
+        visibility: { $in: ["public", "friends-only"] },
+        $or: [
+            { sender: { $in: friendIds } },
+            { recipients: { $elemMatch: { $in: friendIds } } }
+        ]
+    }).sort({ createdAt: -1 });
+
+    if (transactions.length === 0) return [];
+
+    let choices: any[] = [];
+    for (const t of transactions) {
+        let senderUser = await getUserFromID(t.sender);
+        if (!senderUser) senderUser = unknownUser;
+
+        let recipients = "";
+        for (const [i, r] of t.recipients.entries()) {
+            let user = await getUserFromID(r);
+            const name = user ? `${user.first_name} ${user.last_name}` : "Unknown user";
+            recipients = i === 0 ? name : `${recipients}, ${name}`;
+        }
+
+        const visibilityLabel = t.visibility === "friends-only" ? "Friends Only" : "Public";
+
+        choices.push({
+            value: t.id,
+            name: `${senderUser.first_name} ${senderUser.last_name} -> ${recipients}: $${t.amount}`,
+            description: `[${visibilityLabel}] ${t.content} | ${t.reactions.length} reactions | ${t.comments.length} comments`,
+        });
+    }
+    return choices;
+}

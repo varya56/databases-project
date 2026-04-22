@@ -8,6 +8,7 @@ import {
     createTransaction,
     disconnectMongo,
     printAndGetPublicTransactions,
+    getFriendsTransactions,
     printTransactionComments,
     printTransactionReactions,
     unknownUser
@@ -21,6 +22,7 @@ import {
     createFriendship,
     createTransactionRelationship,
     createUser as createNeo4jUser,
+    getFriends,
     getAllUsers,
     getFriendRecommendations
 } from './neo4j/models/userRelations';
@@ -271,6 +273,82 @@ async function terminalListMyTransactions() {
     await select({message: "Your transactions:", choices});
 }
 
+async function terminalListFriendsTransactions() {
+    // Get user's friends
+    const friends = await getFriends(currentUser!.id);
+
+    if (friends.length === 0) {
+        console.log("You have no friends yet. Add some friends to see their transactions!");
+        return;
+    }
+
+    // Get friends ids
+    const friendIds = friends.map((f: any) =>
+        typeof f.userId === "object" ? f.userId.toNumber() : Number(f.userId)
+    );
+
+    while (true) {
+        // Get transactions from mongo and print
+        const choices = await getFriendsTransactions(friendIds);
+
+        if (choices.length === 0) {
+            console.log("None of your friends have any public or friends-only transactions yet.");
+            return;
+        }
+
+        choices.push(new Separator("-- end of list --"));
+        choices.push({ value: "quit", name: "Go back", description: "Return to the main menu." });
+
+        const selectedTransactionID: string = await select({
+            message: "Friends' Transactions — select one to interact:",
+            choices
+        });
+
+        if (selectedTransactionID == "quit") {
+            return;
+        }
+        const transactionAction = await select({
+            message: "Please select an option", choices: [
+                {
+                    name: "View comments",
+                    value: "view_comments"
+                },
+                {
+                    name: "Add comment",
+                    value: "add_comment"
+                },
+                {
+                    name: "View reactions",
+                    value: "view_reactions"
+                },
+                {
+                    name: "Add reaction",
+                    value: "add_reaction"
+                },
+                {
+                    name: "Quit",
+                    value: "quit"
+                },
+            ]
+        })
+
+
+        if (transactionAction == "add_comment") {
+            await addCommentToTransaction(selectedTransactionID, currentUser!, await input({
+                message: "Enter comment:",
+                required: true
+            }));
+        } else if (transactionAction == "add_reaction") {
+            await addReactionToTransaction(selectedTransactionID, currentUser!);
+        } else if (transactionAction == "view_comments") {
+            await printTransactionComments(selectedTransactionID);
+        } else if (transactionAction == "view_reactions") {
+            await printTransactionReactions(selectedTransactionID);
+        } else {
+            break;
+        }
+    }
+}
 
 async function terminalLogin() {
     const email = await input({message: "Email: ", required: true});
@@ -327,6 +405,10 @@ async function main() {
                 {
                     name: "My Transactions",
                     value: "myTransactions"
+                },
+                {
+                    name: "Friends' Transactions",
+                    value: "friendsTransactions"
                 },
                 {
                     name: "Add Friend",
@@ -398,6 +480,10 @@ async function main() {
             }
             case "myTransactions": {
                 await terminalListMyTransactions();
+                break;
+            }
+            case "friendsTransactions": {
+                await terminalListFriendsTransactions();
                 break;
             }
             case "listGraphUsers": {
