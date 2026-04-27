@@ -7,14 +7,13 @@ import {
     connectToMongo,
     createTransaction,
     disconnectMongo,
-    printAndGetPublicTransactions,
     getFriendsTransactions,
+    printAndGetPublicTransactions,
     printTransactionComments,
     printTransactionReactions,
     unknownUser
 } from "./mongo/db.ts";
 import {Transaction} from "./mongo/models/transaction";
-import {createHash} from "crypto"
 import {checkbox, input, number, password, select, Separator} from "@inquirer/prompts";
 import {connectToNeo4j, disconnectNeo4j} from './neo4j/db';
 import {
@@ -22,10 +21,11 @@ import {
     createFriendship,
     createTransactionRelationship,
     createUser as createNeo4jUser,
-    getFriends,
     getAllUsers,
-    getFriendRecommendations
+    getFriendRecommendations,
+    getFriends
 } from './neo4j/models/userRelations';
+import {compare} from "bcrypt";
 
 
 async function terminalRegisterUser() {
@@ -297,7 +297,7 @@ async function terminalListFriendsTransactions() {
         }
 
         choices.push(new Separator("-- end of list --"));
-        choices.push({ value: "quit", name: "Go back", description: "Return to the main menu." });
+        choices.push({value: "quit", name: "Go back", description: "Return to the main menu."});
 
         const selectedTransactionID: string = await select({
             message: "Friends' Transactions — select one to interact:",
@@ -355,7 +355,7 @@ async function terminalLogin() {
     const pw = await password({message: "Password: ", mask: true});
 
     const user = await db.select().from(usersTable).where(eq(usersTable.email, email));
-    if (user.length === 0 || user[0]?.password_hash !== createHash("sha256").update(pw).digest("hex")) {
+    if (user.length === 0 || user[0] == undefined || !await compare(pw, user[0].password_hash)) {
         console.log("Invalid email or password.");
         return;
     }
@@ -369,8 +369,8 @@ let currentUser: User | undefined = undefined;
 async function terminalDepositMoney() {
     const amount = await number({message: "Enter deposit amount: ", min: 0.01, step: 0.01, max: 1000});
     const ssn = await password({
-        message: "Please confirm your SSN:", validate: (n) => {
-            if (createHash("sha256").update(n).digest("hex") != currentUser!.ssn_hash) {
+        message: "Please confirm your SSN:", validate: async (n) => {
+            if (!await compare(n, currentUser!.ssn_hash)) {
                 return "SSN does not match!"
             } else return true
         },

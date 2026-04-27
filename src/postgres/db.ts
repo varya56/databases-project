@@ -2,8 +2,8 @@ import 'dotenv/config';
 import {drizzle} from 'drizzle-orm/node-postgres';
 import {usersTable} from './schema';
 import {eq} from "drizzle-orm"
-import {createHash} from "crypto";
 import {unknownUser} from "../mongo/db.ts";
+import {hash} from "bcrypt";
 
 export type User = typeof usersTable.$inferSelect;
 
@@ -27,8 +27,8 @@ export async function createUser(first_name: string, last_name: string, email: s
             first_name,
             last_name,
             email,
-            ssn_hash: createHash("sha256").update(ssn).digest("hex"),
-            password_hash: createHash("sha256").update(pw).digest("hex")
+            ssn_hash: await hash(ssn, 10),
+            password_hash: await hash(pw, 10)
         })
         .onConflictDoNothing()
         .returning();
