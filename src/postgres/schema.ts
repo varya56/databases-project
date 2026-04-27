@@ -10,5 +10,5 @@ export const usersTable = pgTable("users", {
     balance: decimal({ precision: 19, scale: 2 }).default("0.00").notNull(),
     ssn_hash: char({ length: 64 }).notNull().unique(),
     status: accountStatusEnum().default("active").notNull(),
-    password_hash: char({ length: 64 }).notNull(),
+    password_hash: varchar({ length: 255 }).notNull(),
 });
