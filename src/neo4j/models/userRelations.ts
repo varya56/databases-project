@@ -1,4 +1,4 @@
-import { driver } from '../db';
+import {driver} from '../db';
 
 export async function createUser(userId: number, username: string, email: string) {
     const session = driver.session();
@@ -6,8 +6,10 @@ export async function createUser(userId: number, username: string, email: string
         await session.run(
             `MERGE (u:User {userId: $userId})
              SET u.username = $username, u.email = $email`,
-            { userId, username, email }
+            {userId, username, email}
         );
+    } catch {
+        console.log("Error creating user.")
     } finally {
         await session.close();
     }
@@ -20,8 +22,10 @@ export async function createFriendship(userId1: number, userId2: number) {
             `MATCH (a:User {userId: $userId1}), (b:User {userId: $userId2})
              MERGE (a)-[:FRIENDS_WITH]->(b)
              MERGE (b)-[:FRIENDS_WITH]->(a)`,
-            { userId1, userId2 }
+            {userId1, userId2}
         );
+    } catch {
+        console.log("Error creating friendship.")
     } finally {
         await session.close();
     }
@@ -43,9 +47,11 @@ export async function createTransactionRelationship(
                      transactionId: $transactionId,
                      timestamp: datetime()
                  }]->(b)`,
-                { senderId, recipientId, amount, transactionId }
+                {senderId, recipientId, amount, transactionId}
             );
         }
+    } catch {
+        console.log("Error creating transaction.")
     } finally {
         await session.close();
     }
@@ -67,7 +73,7 @@ export async function getFriends(userId: number) {
         const result = await session.run(
             `MATCH (u:User {userId: $userId})-[:FRIENDS_WITH]->(friend:User)
              RETURN friend.userId AS userId, friend.username AS username, friend.email AS email`,
-            { userId }
+            {userId}
         );
         return result.records.map(r => ({
             userId: r.get('userId'),
@@ -86,7 +92,7 @@ export async function areFriends(userId1: number, userId2: number): Promise<bool
             `RETURN EXISTS {
                 MATCH (a:User {userId: $userId1})-[:FRIENDS_WITH]->(b:User {userId: $userId2})
             } AS areFriends`,
-            { userId1, userId2 }
+            {userId1, userId2}
         );
         return result.records[0]?.get('areFriends') ?? false;
     } finally {
@@ -104,7 +110,7 @@ export async function getFriendRecommendations(userId: number) {
              RETURN recommended.userId AS userId, recommended.username AS username, recommended.email AS email,
                     COUNT(friend) AS mutualCount
              ORDER BY mutualCount DESC`,
-            { userId }
+            {userId}
         );
         return result.records.map(r => ({
             userId: r.get('userId'),
