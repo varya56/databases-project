@@ -8,7 +8,7 @@ export const usersTable = pgTable("users", {
     last_name: varchar({ length: 255 }).notNull(),
     email: varchar({ length: 255 }).notNull().unique(),
     balance: decimal({ precision: 19, scale: 2 }).default("15.00").notNull(),
-    ssn_hash: char({ length: 64 }).notNull().unique(),
+    ssn_hash: varchar({ length: 255 }).notNull().unique(),
     status: accountStatusEnum().default("active").notNull(),
     password_hash: varchar({ length: 255 }).notNull(),
 });
